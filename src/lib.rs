@@ -3,18 +3,16 @@ use sha3::Digest;
 
 pub type CryptoNoteDigest = [u8; 32];
 
+const SCRATCH_PAD_SIZE: usize = 1 << 21;
+
 pub fn digest(input: &[u8]) -> CryptoNoteDigest {
-    let keccac = get_keccac(input);
+    let keccac = sha3::Keccak256Full::digest(input);
+
+    let mut scratch_pad = Vec::<u8>::with_capacity(SCRATCH_PAD_SIZE);
+    // TODO: don't actually initialize the data.
+    scratch_pad.resize(SCRATCH_PAD_SIZE, 0);
+
     unimplemented!()
-}
-
-fn get_keccac(input: &[u8]) -> [u8; 200] {
-    let digest = sha3::Keccak256Full::digest(input);
-
-    let mut digest_buffer: [u8; 200] = unsafe { MaybeUninit::uninit().assume_init()};
-
-    digest_buffer.copy_from_slice(digest.as_slice());
-    digest_buffer
 }
 
 #[cfg(test)]
@@ -23,6 +21,7 @@ mod tests {
 
     #[test]
     fn validate_samples() {
+        // Samples taken from
         validate_sample(b"", b"eb14e8a833fac6fe9a43b57b336789c46ffe93f2868452240720607b14387e11");
         validate_sample(b"This is a test", b"a084f01d1437a09c6985401b60d43554ae105802c5f5d8a9b3253649c0be6605");
     }
