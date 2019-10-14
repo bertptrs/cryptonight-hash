@@ -1,36 +1,57 @@
-use sha3::Digest;
+use digest::{Digest, FixedOutput, Input, Reset};
+use digest::generic_array::GenericArray;
+use digest::generic_array::typenum::U32;
 
 use aes::aes_round;
 use aes::derive_key;
 
 mod aes;
 
-pub type CryptoNoteDigest = [u8; 32];
-
 const SCRATCH_PAD_SIZE: usize = 1 << 21;
 
-pub fn digest(input: &[u8]) -> CryptoNoteDigest {
-    let mut keccac = sha3::Keccak256Full::digest(input);
+#[derive(Default, Clone)]
+pub struct CryptoNight {
+    internal_hasher: sha3::Keccak256Full,
+}
 
-    let round_keys_buffer = derive_key(&keccac[..32]);
+impl Input for CryptoNight {
+    fn input<B: AsRef<[u8]>>(&mut self, data: B) {
+        Input::input(&mut self.internal_hasher, data);
+    }
+}
 
-    let blocks = &mut keccac[64..192];
+impl Reset for CryptoNight {
+    fn reset(&mut self) {
+        Reset::reset(&mut self.internal_hasher);
+    }
+}
 
-    let mut scratch_pad = Vec::<u8>::with_capacity(SCRATCH_PAD_SIZE);
-    // TODO: don't actually initialize the data.
-    scratch_pad.resize(SCRATCH_PAD_SIZE, 0);
+impl FixedOutput for CryptoNight {
+    type OutputSize = U32;
 
-    for scratchpad_chunk in scratch_pad.chunks_exact_mut(blocks.len()) {
-        for block in blocks.chunks_exact_mut(16) {
-            for key in round_keys_buffer.chunks_exact(16) {
-                aes_round(block, key);
+    fn fixed_result(self) -> GenericArray<u8, Self::OutputSize> {
+        let mut keccac = self.internal_hasher.fixed_result();
+
+        let round_keys_buffer = derive_key(&keccac[..32]);
+
+        let blocks = &mut keccac[64..192];
+
+        let mut scratch_pad = Vec::<u8>::with_capacity(SCRATCH_PAD_SIZE);
+        // TODO: don't actually initialize the data.
+        scratch_pad.resize(SCRATCH_PAD_SIZE, 0);
+
+        for scratchpad_chunk in scratch_pad.chunks_exact_mut(blocks.len()) {
+            for block in blocks.chunks_exact_mut(16) {
+                for key in round_keys_buffer.chunks_exact(16) {
+                    aes_round(block, key);
+                }
             }
+
+            scratchpad_chunk.copy_from_slice(blocks);
         }
 
-        scratchpad_chunk.copy_from_slice(blocks);
+        unimplemented!()
     }
-
-    unimplemented!()
 }
 
 #[cfg(test)]
@@ -47,8 +68,8 @@ mod tests {
     fn validate_sample(input: &[u8], hash: &[u8]) {
         let hash = hex::decode(hash).unwrap();
 
-        let actual_result = digest(input);
+        let actual_result = CryptoNight::digest(input);
 
-        assert_eq!(&hash, &actual_result)
+        assert_eq!(actual_result.as_slice(), hash.as_slice())
     }
 }

@@ -177,17 +177,6 @@ mod tests {
     }
 
     #[test]
-    fn test_gmul() {
-        assert_eq!(9, gmul(3, 7));
-
-        for i in 0..=255 {
-            // Validate all doubles since we have a simple method for it.
-            let direct = gmul2(i);
-            assert_eq!(gmul(i, 2), direct);
-        }
-    }
-
-    #[test]
     fn test_derive_key() {
         let primary = hex!("00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f");
         let expected = hex!("00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
