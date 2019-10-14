@@ -1,3 +1,5 @@
+mod aes;
+
 use std::mem::MaybeUninit;
 use sha3::Digest;
 
