@@ -21,16 +21,6 @@ fn s_box(c: u8) -> u8 {
         .bitxor(0x63)
 }
 
-/// Multiply A and B according to the Galois field
-fn gmul(a: u8, b: u8) -> u8 {
-    if a == 0 || b == 0 {
-        0
-    } else {
-        let s = LOG_LOOKUP[a as usize] as usize + LOG_LOOKUP[b as usize] as usize;
-        ANTI_LOG_LOOKUP[s % 255]
-    }
-}
-
 /// Optimized version of gmul for multiplying by two
 #[inline]
 fn gmul2(a: u8) -> u8 {
@@ -47,7 +37,7 @@ fn sub_bytes(block: &mut [u8]) {
 }
 
 /// ShiftRows step
-fn shift_rows(block: &mut [u8; 16]) {
+fn shift_rows(block: &mut [u8]) {
     // Row 0 doesn't move
     // Swap row 1
     let tmp = block[1];
@@ -86,9 +76,9 @@ fn mix_column(slice: &mut [u8]) {
     }
 }
 
-fn mix_columns(block: &mut [u8; 16]) {
-    for offset in (0..16).step_by(4) {
-        mix_column(&mut block[offset..(offset + 4)]);
+fn mix_columns(block: &mut [u8]) {
+    for column in block.chunks_exact_mut(4) {
+        mix_column(column);
     }
 }
 
@@ -98,7 +88,7 @@ fn add_round_key(block: &mut [u8], round_key: &[u8]) {
     }
 }
 
-pub fn aes_round(block: &mut [u8; 16], round_key: &[u8]) {
+pub fn aes_round(block: &mut [u8], round_key: &[u8]) {
     sub_bytes(block);
     shift_rows(block);
     mix_columns(block);
