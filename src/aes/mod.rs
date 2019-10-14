@@ -31,6 +31,14 @@ fn gmul(a: u8, b: u8) -> u8 {
     }
 }
 
+/// Optimized version of gmul for multiplying by two
+#[inline]
+fn gmul2(a: u8) -> u8 {
+    let h = if a >= 0x80 { 0xff } else { 0 };
+
+    return (a << 1) ^ (0x1B & h);
+}
+
 /// SubBytes step
 fn sub_bytes(block: &mut [u8]) {
     for c in block.iter_mut() {
@@ -97,10 +105,10 @@ pub fn aes_round(block: &mut [u8; 16], round_key: &[u8]) {
     add_round_key(block, round_key);
 }
 
-fn schedule_core(new_key: &mut [u8], rcon: usize) {
+fn schedule_core(new_key: &mut [u8], rcon: u8) {
     new_key.rotate_left(1);
     sub_bytes(new_key);
-    new_key[0] ^= ROUND_CONSTANTS[rcon - 1];
+    new_key[0] ^= rcon;
 }
 
 pub fn derive_key(main: &[u8]) -> [u8; 160] {
@@ -117,7 +125,7 @@ pub fn derive_key(main: &[u8]) -> [u8; 160] {
 
         if offset % 32 == 0 {
             schedule_core(next, rcon);
-            rcon += 1;
+            rcon = gmul2(rcon);
         } else if offset % 32 == 16 {
             sub_bytes(next);
         }
@@ -184,8 +192,7 @@ mod tests {
 
         for i in 0..=255 {
             // Validate all doubles since we have a simple method for it.
-            let direct = i << 1;
-            let direct = if i >= 0x80 { direct ^ 0x1B } else { direct };
+            let direct = gmul2(i);
             assert_eq!(gmul(i, 2), direct);
         }
     }
