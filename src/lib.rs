@@ -1,6 +1,5 @@
 mod aes;
 
-use std::mem::MaybeUninit;
 use sha3::Digest;
 
 pub type CryptoNoteDigest = [u8; 32];
