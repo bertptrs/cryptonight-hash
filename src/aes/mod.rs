@@ -69,7 +69,7 @@ fn mix_column(slice: &mut [u8]) {
 
     for (c, db) in slice.iter().zip(b.iter_mut()) {
         // Trick for faster gmul(c, 2)
-        let h =  if *c >= 0x80  { 0xff } else { 0x00 };
+        let h = if *c >= 0x80 { 0xff } else { 0x00 };
         *db = (*c << 1) ^ (h & 0x1B);
     }
 
@@ -95,6 +95,37 @@ pub fn aes_round(block: &mut [u8; 16], round_key: &[u8]) {
     shift_rows(block);
     mix_columns(block);
     add_round_key(block, round_key);
+}
+
+fn schedule_core(new_key: &mut [u8], rcon: usize) {
+    new_key.rotate_left(1);
+    sub_bytes(new_key);
+    new_key[0] ^= ROUND_CONSTANTS[rcon - 1];
+}
+
+pub fn derive_key(main: &[u8]) -> [u8; 160] {
+    let mut key_buffer = [0u8; 160];
+    key_buffer[..32].copy_from_slice(main);
+
+    let mut rcon = 1;
+
+    for offset in (32..key_buffer.len()).step_by(4) {
+        let (finished, in_progress) = key_buffer.split_at_mut(offset);
+        let previous = &finished[offset - 4..];
+        let next = &mut in_progress[..4];
+        next.copy_from_slice(previous);
+
+        if offset % 32 == 0 {
+            schedule_core(next, rcon);
+            rcon += 1;
+        } else if offset % 32 == 16 {
+            sub_bytes(next);
+        }
+
+        add_round_key(next, &finished[(offset - 32)..]);
+    }
+
+    key_buffer
 }
 
 #[cfg(test)]
@@ -157,5 +188,22 @@ mod tests {
             let direct = if i >= 0x80 { direct ^ 0x1B } else { direct };
             assert_eq!(gmul(i, 2), direct);
         }
+    }
+
+    #[test]
+    fn test_derive_key() {
+        let primary = hex!("00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f");
+        let expected = hex!("00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+                             10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f
+                             a5 73 c2 9f a1 76 c4 98 a9 7f ce 93 a5 72 c0 9c
+                             16 51 a8 cd 02 44 be da 1a 5d a4 c1 06 40 ba de
+                             ae 87 df f0 0f f1 1b 68 a6 8e d5 fb 03 fc 15 67
+                             6d e1 f1 48 6f a5 4f 92 75 f8 eb 53 73 b8 51 8d
+                             c6 56 82 7f c9 a7 99 17 6f 29 4c ec 6c d5 59 8b
+                             3d e2 3a 75 52 47 75 e7 27 bf 9e b4 54 07 cf 39
+                             0b dc 90 5f c2 7b 09 48 ad 52 45 a4 c1 87 1c 2f
+                             45 f5 a6 60 17 b2 d3 87 30 0d 4d 33 64 0a 82 0a");
+        let result = derive_key(&primary);
+        assert_eq!(result.as_ref(), expected.as_ref());
     }
 }

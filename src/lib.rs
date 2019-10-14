@@ -1,6 +1,8 @@
-mod aes;
-
 use sha3::Digest;
+
+use aes::derive_key;
+
+mod aes;
 
 pub type CryptoNoteDigest = [u8; 32];
 
@@ -8,6 +10,8 @@ const SCRATCH_PAD_SIZE: usize = 1 << 21;
 
 pub fn digest(input: &[u8]) -> CryptoNoteDigest {
     let keccac = sha3::Keccak256Full::digest(input);
+
+    let round_keys = derive_key(&keccac[..32]);
 
     let mut scratch_pad = Vec::<u8>::with_capacity(SCRATCH_PAD_SIZE);
     // TODO: don't actually initialize the data.

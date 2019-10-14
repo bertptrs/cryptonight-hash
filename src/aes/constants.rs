@@ -1,15 +1,15 @@
 /// Key derivation round constants
-pub const ROUND_CONSTANTS: [u32; 10] = [
-    0x0100_0000,
-    0x0200_0000,
-    0x0400_0000,
-    0x0800_0000,
-    0x1000_0000,
-    0x2000_0000,
-    0x4000_0000,
-    0x8000_0000,
-    0x1B00_0000,
-    0x3600_0000,
+pub const ROUND_CONSTANTS: [u8; 10] = [
+    0x01,
+    0x02,
+    0x04,
+    0x08,
+    0x10,
+    0x20,
+    0x40,
+    0x80,
+    0x1B,
+    0x36,
 ];
 
 /// Log table using 0xe5 as a generator.
