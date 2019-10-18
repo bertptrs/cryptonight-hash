@@ -1,11 +1,12 @@
 use std::intrinsics::transmute;
 
-use blake2::Blake2s;
+use blake_hash::Blake256;
 use digest::{Digest, FixedOutput, Input, Reset};
 use digest::generic_array::GenericArray;
 use digest::generic_array::typenum::U32;
 use groestl::Groestl256;
 use itertools::multizip;
+use jh_x86_64::Jh256;
 use skein_hash::Skein256;
 
 use aes::aes_round;
@@ -49,6 +50,23 @@ fn scratch_add(a: ScratchBlock, b: ScratchBlock) -> ScratchBlock {
 }
 
 impl CryptoNight {
+    fn init_scratchpad(keccac: &[u8], scratchpad: &mut [u8]) {
+        let round_keys_buffer = derive_key(&keccac[..32]);
+
+        let mut blocks = [0u8; 128];
+        blocks.copy_from_slice(&keccac[64..192]);
+
+        for scratchpad_chunk in scratchpad.chunks_exact_mut(blocks.len()) {
+            for block in blocks.chunks_exact_mut(16) {
+                for key in round_keys_buffer.chunks_exact(16) {
+                    aes_round(block, key);
+                }
+            }
+
+            scratchpad_chunk.copy_from_slice(&blocks);
+        }
+    }
+
     fn main_loop(mut a: [u8; 16], mut b: [u8; 16], scratch_pad: &mut [u8]) {
         // Cast to u128 for easier handling. Scratch pad is only used in 16 byte blocks
 
@@ -71,6 +89,29 @@ impl CryptoNight {
             xor(&mut scratch_pad[address..end], &tmp);
         }
     }
+
+    fn finalize_state(keccac: &mut [u8], scratch_pad: &[u8]) {
+        let round_keys_buffer = derive_key(&keccac[32..64]);
+        let final_block = &mut keccac[64..192];
+        for scratchpad_chunk in scratch_pad.chunks_exact(128) {
+            xor(final_block, scratchpad_chunk);
+            for block in final_block.chunks_exact_mut(16) {
+                for key in round_keys_buffer.chunks_exact(16) {
+                    aes_round(block, key);
+                }
+            }
+        }
+    }
+
+    fn hash_final_state(state: &[u8]) -> GenericArray<u8, <Self as FixedOutput>::OutputSize> {
+        match state[0] & 3 {
+            0 => Blake256::digest(&state),
+            1 => Groestl256::digest(&state),
+            2 => Jh256::digest(&state),
+            3 => Skein256::digest(&state),
+            _ => unreachable!("Invalid output option")
+        }
+    }
 }
 
 impl Input for CryptoNight {
@@ -91,23 +132,10 @@ impl FixedOutput for CryptoNight {
     fn fixed_result(self) -> GenericArray<u8, Self::OutputSize> {
         let mut keccac = self.internal_hasher.fixed_result();
 
-        let round_keys_buffer = derive_key(&keccac[..32]);
-
-        let mut blocks = [0u8; 128];
-        blocks.copy_from_slice(&keccac[64..192]);
-
         let mut scratch_pad = Vec::<u8>::with_capacity(SCRATCH_PAD_SIZE);
         unsafe { scratch_pad.set_len(SCRATCH_PAD_SIZE) };
 
-        for scratchpad_chunk in scratch_pad.chunks_exact_mut(blocks.len()) {
-            for block in blocks.chunks_exact_mut(16) {
-                for key in round_keys_buffer.chunks_exact(16) {
-                    aes_round(block, key);
-                }
-            }
-
-            scratchpad_chunk.copy_from_slice(&blocks);
-        }
+        Self::init_scratchpad(&keccac, &mut scratch_pad);
 
         let mut a = [0u8; 16];
         let mut b = [0u8; 16];
@@ -118,28 +146,13 @@ impl FixedOutput for CryptoNight {
 
         CryptoNight::main_loop(a, b, &mut scratch_pad);
 
-        let round_keys_buffer = derive_key(&keccac[32..64]);
-        let final_block = &mut keccac[64..192];
-        for scratchpad_chunk in scratch_pad.chunks_exact(128) {
-            xor(final_block, scratchpad_chunk);
-            for block in final_block.chunks_exact_mut(16) {
-                for key in round_keys_buffer.chunks_exact(16) {
-                    aes_round(block, key);
-                }
-            }
-        }
-
+        CryptoNight::finalize_state(&mut keccac, &mut scratch_pad);
         tiny_keccak::keccakf(unsafe { transmute(&mut keccac) });
 
-        match keccac[0] & 3 {
-            0 => Blake2s::digest(&keccac),
-            1 => Groestl256::digest(&keccac),
-            2 => unimplemented!("Haven't found a suitable JH crate yet."),
-            3 => Skein256::digest(&keccac),
-            _ => unreachable!("Invalid output option")
-        }
+        Self::hash_final_state(&keccac)
     }
 }
+
 
 #[cfg(test)]
 mod tests {
