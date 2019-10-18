@@ -5,49 +5,25 @@ use digest::{Digest, FixedOutput, Input, Reset};
 use digest::generic_array::GenericArray;
 use digest::generic_array::typenum::U32;
 use groestl::Groestl256;
-use itertools::multizip;
 use jh_x86_64::Jh256;
 use skein_hash::Skein256;
 
-use aes::aes_round;
-use aes::derive_key;
-use aes::xor;
+use crate::aes::aes_round;
+use crate::aes::derive_key;
+use crate::aes::xor;
+use crate::u64p::U64p;
 
 mod aes;
+mod u64p;
 
 const SCRATCH_PAD_SIZE: usize = 1 << 21;
-
-type ScratchBlock = [u8; 16];
+const ROUNDS: usize = 524_288;
 
 #[derive(Default, Clone)]
 pub struct CryptoNight {
     internal_hasher: sha3::Keccak256Full,
 }
 
-fn to_u128(a: ScratchBlock) -> u128 {
-    unsafe { transmute(a) }
-}
-
-fn to_scratch_pad_address(a: ScratchBlock) -> usize {
-    let a = to_u128(a);
-    // Take the lowest 21 bits, and zero the lowest 4 for alignment
-    (a & 0x1F_FFF0) as usize
-}
-
-fn scratch_mul(a: ScratchBlock, b: ScratchBlock) -> ScratchBlock {
-    const MASK: u128 = 0xFFFF_FFFF_FFFF_FFFF;
-    let a = to_u128(a) & MASK;
-    let b = to_u128(b) & MASK;
-
-    unsafe { transmute(a * b) }
-}
-
-fn scratch_add(a: ScratchBlock, b: ScratchBlock) -> ScratchBlock {
-    let (a, b): ([u64; 2], [u64; 2]) = unsafe { (transmute(a), transmute(b)) };
-    let result = [a[0].wrapping_add(b[0]), a[1].wrapping_add(b[1])];
-
-    unsafe { transmute(result) }
-}
 
 impl CryptoNight {
     fn init_scratchpad(keccac: &[u8], scratchpad: &mut [u8]) {
@@ -67,26 +43,25 @@ impl CryptoNight {
         }
     }
 
-    fn main_loop(mut a: [u8; 16], mut b: [u8; 16], scratch_pad: &mut [u8]) {
+    fn main_loop(mut a: U64p, mut b: U64p, scratch_pad: &mut [u8]) {
         // Cast to u128 for easier handling. Scratch pad is only used in 16 byte blocks
 
-        for _ in 0..524_288 {
+        for _ in 0..ROUNDS {
             // First transfer
-            let address = to_scratch_pad_address(a);
+            let address: usize = a.into();
             let end = address + 16;
-            aes_round(&mut scratch_pad[address..end], &a);
-            let tmp = b;
-            b.copy_from_slice(&scratch_pad[address..end]);
+
+            aes_round(&mut scratch_pad[address..end], a.as_ref());
+            let tmp: [u8; 16] = b.into();
+            b = U64p::from(&scratch_pad[address..end]);
             xor(&mut scratch_pad[address..end], &tmp);
 
             // Second transfer
-            let address = to_scratch_pad_address(b);
+            let address: usize = b.into();
             let end = address + 16;
-            let mut c: ScratchBlock = Default::default();
-            c.copy_from_slice(&scratch_pad[address..end]);
-            let tmp = scratch_add(a, scratch_mul(b, c));
-            a.copy_from_slice(&scratch_pad[address..end]);
-            xor(&mut scratch_pad[address..end], &tmp);
+            let tmp = a + b * U64p::from(&scratch_pad[address..end]);
+            a = U64p::from(&scratch_pad[address..end]);
+            xor(&mut scratch_pad[address..end], tmp.as_ref());
         }
     }
 
@@ -137,12 +112,8 @@ impl FixedOutput for CryptoNight {
 
         Self::init_scratchpad(&keccac, &mut scratch_pad);
 
-        let mut a = [0u8; 16];
-        let mut b = [0u8; 16];
-
-        for (dest, a, b) in multizip((a.iter_mut().chain(b.iter_mut()), &keccac, &keccac[32..])) {
-            *dest = *a ^ *b;
-        }
+        let a = U64p::from(&keccac[..16]) ^ U64p::from(&keccac[32..48]);
+        let b = U64p::from(&keccac[16..32]) ^ U64p::from(&keccac[48..64]);
 
         CryptoNight::main_loop(a, b, &mut scratch_pad);
 
@@ -177,25 +148,5 @@ mod tests {
         let actual_result = CryptoNight::digest(input);
 
         assert_eq!(actual_result.as_slice(), hash.as_slice())
-    }
-
-    #[test]
-    fn test_8byte_add() {
-        unsafe {
-            let a: ScratchBlock = transmute([42u64, 12u64]);
-            let b: ScratchBlock = transmute([42u64, 36u64]);
-            let r = scratch_add(a, b);
-            assert_eq!(r, transmute::<_, ScratchBlock>([84u64, 48u64]))
-        }
-    }
-
-    #[test]
-    fn test_8byte_mul() {
-        unsafe {
-            let a: ScratchBlock = transmute(6u128);
-            let b: ScratchBlock = transmute(7u128);
-            let r = scratch_mul(a, b);
-            assert_eq!(r, transmute::<_, ScratchBlock>(42u128))
-        }
     }
 }
