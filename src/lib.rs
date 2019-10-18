@@ -1,9 +1,9 @@
-use std::intrinsics::transmute;
+use std::alloc::{alloc, Layout};
 
 use blake_hash::Blake256;
 use digest::{Digest, FixedOutput, Input, Reset};
 use digest::generic_array::GenericArray;
-use digest::generic_array::typenum::U32;
+use digest::generic_array::typenum::{U200, U32};
 use groestl::Groestl256;
 use jh_x86_64::Jh256;
 use skein_hash::Skein256;
@@ -18,6 +18,10 @@ mod u64p;
 
 const SCRATCH_PAD_SIZE: usize = 1 << 21;
 const ROUNDS: usize = 524_288;
+
+#[repr(align(16))]
+/// Helper to enforce 16 byte alignment
+struct A16<T>(pub T);
 
 #[derive(Default, Clone)]
 pub struct CryptoNight {
@@ -105,20 +109,24 @@ impl FixedOutput for CryptoNight {
     type OutputSize = U32;
 
     fn fixed_result(self) -> GenericArray<u8, Self::OutputSize> {
-        let mut keccac = self.internal_hasher.fixed_result();
+        let mut keccac = A16(self.internal_hasher.fixed_result());
+        let keccac = &mut keccac.0;
 
-        let mut scratch_pad = Vec::<u8>::with_capacity(SCRATCH_PAD_SIZE);
-        unsafe { scratch_pad.set_len(SCRATCH_PAD_SIZE) };
+        let mut scratch_pad = unsafe {
+            let buffer = alloc(Layout::from_size_align_unchecked(SCRATCH_PAD_SIZE, 16));
+            Vec::from_raw_parts(buffer, SCRATCH_PAD_SIZE, SCRATCH_PAD_SIZE)
+        };
 
-        Self::init_scratchpad(&keccac, &mut scratch_pad);
+        Self::init_scratchpad(keccac, &mut scratch_pad);
 
         let a = U64p::from(&keccac[..16]) ^ U64p::from(&keccac[32..48]);
         let b = U64p::from(&keccac[16..32]) ^ U64p::from(&keccac[48..64]);
 
         CryptoNight::main_loop(a, b, &mut scratch_pad);
 
-        CryptoNight::finalize_state(&mut keccac, &mut scratch_pad);
-        tiny_keccak::keccakf(unsafe { transmute(&mut keccac) });
+        CryptoNight::finalize_state(keccac, &scratch_pad);
+
+        tiny_keccak::keccakf(unsafe { &mut *(keccac as *mut GenericArray<u8, U200> as *mut [u64; 25]) });
 
         Self::hash_final_state(&keccac)
     }

@@ -8,7 +8,7 @@ fn multiplicative_inverse(b: u8) -> u8 {
     if b <= 1 {
         b
     } else {
-        return ANTI_LOG_LOOKUP[255 - LOG_LOOKUP[b as usize] as usize];
+        ANTI_LOG_LOOKUP[255 - LOG_LOOKUP[b as usize] as usize]
     }
 }
 
@@ -26,7 +26,7 @@ fn s_box(c: u8) -> u8 {
 fn gmul2(a: u8) -> u8 {
     let h = if a >= 0x80 { 0xff } else { 0 };
 
-    return (a << 1) ^ (0x1B & h);
+    (a << 1) ^ (0x1B & h)
 }
 
 /// SubBytes step

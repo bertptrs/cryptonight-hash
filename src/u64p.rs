@@ -24,8 +24,17 @@ impl From<&[u8]> for U64p {
 impl AsRef<[u8]> for U64p {
     fn as_ref(&self) -> &[u8] {
         unsafe {
-            let data: &[u8; 16] = transmute(self);
+            let data: &[u8; 16] = &*(self as *const Self as *const [u8; 16]);
             data.as_ref()
+        }
+    }
+}
+
+impl AsMut<[u8]> for U64p {
+    fn as_mut(&mut self) -> &mut [u8] {
+        unsafe {
+            let data: &mut[u8; 16] = &mut *(self as *mut Self as *mut [u8; 16]);
+            data.as_mut()
         }
     }
 }
@@ -57,10 +66,12 @@ impl Mul for U64p {
     type Output = U64p;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let a = self.0 as u128;
-        let b = rhs.0 as u128;
+        let a = u128::from(self.0);
+        let b = u128::from(rhs.0);
 
-        unsafe { transmute(a * b) }
+        let r = a * b;
+
+        U64p((r >> 64) as u64, r as u64)
     }
 }
 
@@ -68,10 +79,6 @@ impl BitXor for U64p {
     type Output = U64p;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-        unsafe {
-            let a: u128 = transmute(self);
-            let b: u128 = transmute(rhs);
-            transmute(a ^ b)
-        }
+        U64p (self.0 ^ rhs.0, self.1 ^ rhs.1)
     }
 }
