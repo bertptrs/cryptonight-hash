@@ -1,14 +1,16 @@
 use std::intrinsics::transmute;
 
-use digest::{FixedOutput, Input, Reset};
+use blake2::Blake2s;
+use digest::{Digest, FixedOutput, Input, Reset};
 use digest::generic_array::GenericArray;
 use digest::generic_array::typenum::U32;
+use groestl::Groestl256;
 use itertools::multizip;
+use skein_hash::Skein256;
 
 use aes::aes_round;
 use aes::derive_key;
-
-use crate::aes::xor;
+use aes::xor;
 
 mod aes;
 
@@ -87,7 +89,7 @@ impl FixedOutput for CryptoNight {
     type OutputSize = U32;
 
     fn fixed_result(self) -> GenericArray<u8, Self::OutputSize> {
-        let keccac = self.internal_hasher.fixed_result();
+        let mut keccac = self.internal_hasher.fixed_result();
 
         let round_keys_buffer = derive_key(&keccac[..32]);
 
@@ -116,14 +118,31 @@ impl FixedOutput for CryptoNight {
 
         CryptoNight::main_loop(a, b, &mut scratch_pad);
 
-        unimplemented!()
+        let round_keys_buffer = derive_key(&keccac[32..64]);
+        let final_block = &mut keccac[64..192];
+        for scratchpad_chunk in scratch_pad.chunks_exact(128) {
+            xor(final_block, scratchpad_chunk);
+            for block in final_block.chunks_exact_mut(16) {
+                for key in round_keys_buffer.chunks_exact(16) {
+                    aes_round(block, key);
+                }
+            }
+        }
+
+        tiny_keccak::keccakf(unsafe { transmute(&mut keccac) });
+
+        match keccac[0] & 3 {
+            0 => Blake2s::digest(&keccac),
+            1 => Groestl256::digest(&keccac),
+            2 => unimplemented!("Haven't found a suitable JH crate yet."),
+            3 => Skein256::digest(&keccac),
+            _ => unreachable!("Invalid output option")
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use digest::Digest;
-
     use super::*;
 
     #[test]
