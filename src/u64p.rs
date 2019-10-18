@@ -71,6 +71,7 @@ impl Mul for U64p {
 
         let r = a * b;
 
+        #[allow(clippy::suspicious_arithmetic_impl)]
         U64p((r >> 64) as u64, r as u64)
     }
 }

@@ -125,6 +125,7 @@ impl FixedOutput for CryptoNight {
 
         CryptoNight::finalize_state(keccac, &scratch_pad);
 
+        #[allow(clippy::cast_ptr_alignment)]
         tiny_keccak::keccakf(unsafe { &mut *(keccac as *mut GenericArray<u8, U200> as *mut [u64; 25]) });
 
         Self::hash_final_state(&keccac)
