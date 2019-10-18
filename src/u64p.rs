@@ -42,7 +42,7 @@ impl AsMut<[u8]> for U64p {
 /// Convert a 16 bit slice into a scratch pad address.
 impl From<U64p> for usize {
     fn from(data: U64p) -> Self {
-        (data.0 & 0x1F_FFF0) as usize
+        (data.0 & 0x1F_FFF0) as usize / 16
     }
 }
 

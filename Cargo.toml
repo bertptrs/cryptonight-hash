@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 digest = "0.8.1"
 sha3 = "0.8.2"
+slice-cast = "0.1.2"
 tiny-keccak = "1.5.0"
 
 # Hashes needed for implementing the final step

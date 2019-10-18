@@ -12,6 +12,7 @@ use crate::aes::aes_round;
 use crate::aes::derive_key;
 use crate::aes::xor;
 use crate::u64p::U64p;
+use slice_cast::cast_mut;
 
 mod aes;
 mod u64p;
@@ -49,23 +50,21 @@ impl CryptoNight {
 
     fn main_loop(mut a: U64p, mut b: U64p, scratch_pad: &mut [u8]) {
         // Cast to u128 for easier handling. Scratch pad is only used in 16 byte blocks
+        let scratch_pad: &mut [U64p] = unsafe { cast_mut(scratch_pad)};
 
         for _ in 0..ROUNDS {
             // First transfer
             let address: usize = a.into();
-            let end = address + 16;
-
-            aes_round(&mut scratch_pad[address..end], a.as_ref());
-            let tmp: [u8; 16] = b.into();
-            b = U64p::from(&scratch_pad[address..end]);
-            xor(&mut scratch_pad[address..end], &tmp);
+            aes_round(&mut scratch_pad[address].as_mut(), a.as_ref());
+            let tmp = b;
+            b = scratch_pad[address];
+            scratch_pad[address] = scratch_pad[address] ^ tmp;
 
             // Second transfer
             let address: usize = b.into();
-            let end = address + 16;
-            let tmp = a + b * U64p::from(&scratch_pad[address..end]);
-            a = U64p::from(&scratch_pad[address..end]);
-            xor(&mut scratch_pad[address..end], tmp.as_ref());
+            let tmp = a + b * scratch_pad[address];
+            a = scratch_pad[address] ^ tmp;
+            scratch_pad[address] = tmp;
         }
     }
 
