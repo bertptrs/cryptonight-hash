@@ -66,9 +66,7 @@ fn mix_column(slice: &mut [u8]) {
     a.copy_from_slice(slice);
 
     for (c, db) in slice.iter().zip(b.iter_mut()) {
-        // Trick for faster gmul(c, 2)
-        let h = if *c >= 0x80 { 0xff } else { 0x00 };
-        *db = (*c << 1) ^ (h & 0x1B);
+        *db = gmul2(*c);
     }
 
     for (i, dest) in slice.iter_mut().enumerate() {
