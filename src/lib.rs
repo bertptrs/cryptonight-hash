@@ -121,9 +121,9 @@ impl FixedOutput for CryptoNight {
         let a = U64p::from(&keccac[..16]) ^ U64p::from(&keccac[32..48]);
         let b = U64p::from(&keccac[16..32]) ^ U64p::from(&keccac[48..64]);
 
-        CryptoNight::main_loop(a, b, &mut scratch_pad);
+        Self::main_loop(a, b, &mut scratch_pad);
 
-        CryptoNight::finalize_state(keccac, &scratch_pad);
+        Self::finalize_state(keccac, &scratch_pad);
 
         #[allow(clippy::cast_ptr_alignment)]
         tiny_keccak::keccakf(unsafe { &mut *(keccac as *mut GenericArray<u8, U200> as *mut [u64; 25]) });
