@@ -82,7 +82,7 @@ fn mix_columns(block: &mut [u8]) {
     }
 }
 
-fn add_round_key(block: &mut [u8], round_key: &[u8]) {
+pub fn xor(block: &mut [u8], round_key: &[u8]) {
     for (c, k) in block.iter_mut().zip(round_key.iter()) {
         *c ^= *k;
     }
@@ -92,7 +92,7 @@ pub fn aes_round(block: &mut [u8], round_key: &[u8]) {
     sub_bytes(block);
     shift_rows(block);
     mix_columns(block);
-    add_round_key(block, round_key);
+    xor(block, round_key);
 }
 
 fn schedule_core(new_key: &mut [u8], rcon: u8) {
@@ -120,7 +120,7 @@ pub fn derive_key(main: &[u8]) -> [u8; 160] {
             sub_bytes(next);
         }
 
-        add_round_key(next, &finished[(offset - 32)..]);
+        xor(next, &finished[(offset - 32)..]);
     }
 
     key_buffer
