@@ -24,7 +24,7 @@ fn s_box(c: u8) -> u8 {
 /// Optimized version of gmul for multiplying by two
 #[inline]
 fn gmul2(a: u8) -> u8 {
-    let h = if a >= 0x80 { 0xff } else { 0 };
+    let h = !(a >> 7).wrapping_sub(1);
 
     (a << 1) ^ (0x1B & h)
 }
