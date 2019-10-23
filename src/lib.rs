@@ -8,12 +8,6 @@ use groestl::Groestl256;
 use jh_x86_64::Jh256;
 use skein_hash::Skein256;
 
-use crate::aes::aes_round;
-use crate::aes::derive_key;
-use crate::aes::xor;
-use crate::u64p::U64p;
-use slice_cast::cast_mut;
-
 mod aes;
 mod u64p;
 
@@ -31,56 +25,6 @@ pub struct CryptoNight {
 
 
 impl CryptoNight {
-    fn init_scratchpad(keccac: &[u8], scratchpad: &mut [u8]) {
-        let round_keys_buffer = derive_key(&keccac[..32]);
-
-        let mut blocks = [0u8; 128];
-        blocks.copy_from_slice(&keccac[64..192]);
-
-        for scratchpad_chunk in scratchpad.chunks_exact_mut(blocks.len()) {
-            for block in blocks.chunks_exact_mut(16) {
-                for key in round_keys_buffer.chunks_exact(16) {
-                    aes_round(block, key);
-                }
-            }
-
-            scratchpad_chunk.copy_from_slice(&blocks);
-        }
-    }
-
-    fn main_loop(mut a: U64p, mut b: U64p, scratch_pad: &mut [u8]) {
-        // Cast to u128 for easier handling. Scratch pad is only used in 16 byte blocks
-        let scratch_pad: &mut [U64p] = unsafe { cast_mut(scratch_pad)};
-
-        for _ in 0..ROUNDS {
-            // First transfer
-            let address: usize = a.into();
-            aes_round(&mut scratch_pad[address].as_mut(), a.as_ref());
-            let tmp = b;
-            b = scratch_pad[address];
-            scratch_pad[address] = scratch_pad[address] ^ tmp;
-
-            // Second transfer
-            let address: usize = b.into();
-            let tmp = a + b * scratch_pad[address];
-            a = scratch_pad[address] ^ tmp;
-            scratch_pad[address] = tmp;
-        }
-    }
-
-    fn finalize_state(keccac: &mut [u8], scratch_pad: &[u8]) {
-        let round_keys_buffer = derive_key(&keccac[32..64]);
-        let final_block = &mut keccac[64..192];
-        for scratchpad_chunk in scratch_pad.chunks_exact(128) {
-            xor(final_block, scratchpad_chunk);
-            for block in final_block.chunks_exact_mut(16) {
-                for key in round_keys_buffer.chunks_exact(16) {
-                    aes_round(block, key);
-                }
-            }
-        }
-    }
-
     fn hash_final_state(state: &[u8]) -> GenericArray<u8, <Self as FixedOutput>::OutputSize> {
         match state[0] & 3 {
             0 => Blake256::digest(&state),
@@ -116,14 +60,7 @@ impl FixedOutput for CryptoNight {
             Vec::from_raw_parts(buffer, SCRATCH_PAD_SIZE, SCRATCH_PAD_SIZE)
         };
 
-        Self::init_scratchpad(keccac, &mut scratch_pad);
-
-        let a = U64p::from(&keccac[..16]) ^ U64p::from(&keccac[32..48]);
-        let b = U64p::from(&keccac[16..32]) ^ U64p::from(&keccac[48..64]);
-
-        Self::main_loop(a, b, &mut scratch_pad);
-
-        Self::finalize_state(keccac, &scratch_pad);
+        aes::digest_main(keccac, &mut scratch_pad);
 
         #[allow(clippy::cast_ptr_alignment)]
         tiny_keccak::keccakf(unsafe { &mut *(keccac as *mut GenericArray<u8, U200> as *mut [u64; 25]) });
