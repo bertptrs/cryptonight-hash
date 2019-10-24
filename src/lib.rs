@@ -30,7 +30,7 @@ impl CryptoNight {
     fn digest_main(keccac: &mut [u8], scratchpad: &mut [u8]) {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             {
-                if is_x86_feature_detected!("aes") {
+                if is_x86_feature_detected!("aes") && is_x86_feature_detected!("sse2") {
                     return unsafe { aesni::digest_main(keccac, scratchpad) };
                 }
             }
