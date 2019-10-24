@@ -9,6 +9,8 @@ use jh_x86_64::Jh256;
 use skein_hash::Skein256;
 
 mod aes;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+mod aesni;
 mod u64p;
 
 const SCRATCH_PAD_SIZE: usize = 1 << 21;
@@ -25,6 +27,17 @@ pub struct CryptoNight {
 
 
 impl CryptoNight {
+    fn digest_main(keccac: &mut [u8], scratchpad: &mut [u8]) {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("aes") {
+                return unsafe { aesni::digest_main(keccac, scratchpad) };
+            }
+        }
+
+        aes::digest_main(keccac, scratchpad);
+    }
+
     fn hash_final_state(state: &[u8]) -> GenericArray<u8, <Self as FixedOutput>::OutputSize> {
         match state[0] & 3 {
             0 => Blake256::digest(&state),
@@ -60,10 +73,10 @@ impl FixedOutput for CryptoNight {
             Vec::from_raw_parts(buffer, SCRATCH_PAD_SIZE, SCRATCH_PAD_SIZE)
         };
 
-        aes::digest_main(keccac, &mut scratch_pad);
+        Self::digest_main(keccac, &mut scratch_pad);
 
         #[allow(clippy::cast_ptr_alignment)]
-        tiny_keccak::keccakf(unsafe { &mut *(keccac as *mut GenericArray<u8, U200> as *mut [u64; 25]) });
+            tiny_keccak::keccakf(unsafe { &mut *(keccac as *mut GenericArray<u8, U200> as *mut [u64; 25]) });
 
         Self::hash_final_state(&keccac)
     }
