@@ -6,37 +6,36 @@
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use std::mem::{size_of, transmute};
+use std::mem::{MaybeUninit, size_of, transmute};
 
 use slice_cast::cast_mut;
 
 use crate::aes::derive_key;
 use crate::ROUNDS;
-use crate::u64p::U64p;
+
+/// Type for a set of explode/implode AES keys.
+type KeysType = [__m128i; 10];
 
 pub unsafe fn digest_main(keccac: &mut [u8], scratchpad: &mut [u8]) {
     let scratchpad: &mut [__m128i] = cast_mut(scratchpad);
-    init_scratchpad(keccac, scratchpad);
+    // TODO: implement key derivation with aesni.
+    let explode_keys: KeysType = transmute(derive_key(&keccac[..32]));
+    let implode_keys: KeysType = transmute(derive_key(&keccac[32..64]));
+    // Now we can cast keccac since it's not needed as u8 anymore
+    let keccac: &mut [__m128i] = cast_mut(&mut keccac[..192]);
 
-    let a = U64p::from(&keccac[..16]) ^ U64p::from(&keccac[32..48]);
-    let b = U64p::from(&keccac[16..32]) ^ U64p::from(&keccac[48..64]);
-
-    main_loop(a, b, scratchpad);
-
-    finalize_state(keccac, &scratchpad);
+    init_scratchpad(explode_keys, keccac, scratchpad);
+    main_loop(keccac, scratchpad);
+    finalize_state(implode_keys, keccac, &scratchpad);
 }
 
-unsafe fn init_scratchpad(keccac: &[u8], scratchpad: &mut [__m128i]) {
-    let round_keys_buffer: [__m128i; 10] = transmute(derive_key(&keccac[..32]));
-
-    let mut blocks = [0u8; 128];
-    blocks.copy_from_slice(&keccac[64..192]);
-
-    let mut blocks: [__m128i; 8] = transmute(blocks);
+unsafe fn init_scratchpad(keys: KeysType, keccac: &[__m128i], scratchpad: &mut [__m128i]) {
+    let mut blocks: [__m128i; 8] =MaybeUninit::uninit().assume_init();
+    blocks.copy_from_slice(&keccac[4..]);
 
     for scratchpad_chunk in scratchpad.chunks_exact_mut(blocks.len()) {
         for block in blocks.iter_mut() {
-            for key in round_keys_buffer.iter() {
+            for key in keys.iter() {
                 *block = _mm_aesenc_si128(*block, *key);
             }
         }
@@ -45,9 +44,9 @@ unsafe fn init_scratchpad(keccac: &[u8], scratchpad: &mut [__m128i]) {
     }
 }
 
-unsafe fn main_loop(a: U64p, b: U64p, scratchpad: &mut [__m128i]) {
-    let mut a: __m128i = transmute(a);
-    let mut b: __m128i = transmute(b);
+unsafe fn main_loop(keccac: &[__m128i], scratchpad: &mut [__m128i]) {
+    let mut a = _mm_xor_si128(keccac[0], keccac[2]);
+    let mut b = _mm_xor_si128(keccac[1], keccac[3]);
 
     for _ in 0..ROUNDS {
         // First transfer
@@ -88,14 +87,13 @@ unsafe fn cn_8byte_mul(a: __m128i, b: __m128i) -> __m128i {
     _mm_set_epi64x(c as i64, (c >> 64) as i64)
 }
 
-unsafe fn finalize_state(keccac: &mut [u8], scratchpad: &[__m128i]) {
-    let round_keys_buffer: [__m128i; 10] = transmute(derive_key(&keccac[32..64]));
-    let final_block: &mut [__m128i] = cast_mut(&mut keccac[64..192]);
+unsafe fn finalize_state(keys: KeysType, keccac: &mut [__m128i], scratchpad: &[__m128i]) {
+    let final_block: &mut [__m128i] = cast_mut(&mut keccac[4..]);
 
     for scratchpad_chunk in scratchpad.chunks_exact(final_block.len()) {
         for (block, sp_slice) in final_block.iter_mut().zip(scratchpad_chunk.iter()) {
             *block = _mm_xor_si128(*block, *sp_slice);
-            for key in round_keys_buffer.iter() {
+            for key in keys.iter() {
                 *block = _mm_aesenc_si128(*block, *key);
             }
         }
