@@ -12,6 +12,7 @@ use slice_cast::cast_mut;
 use crate::aes::{aes_round, derive_key, xor};
 use crate::ROUNDS;
 use crate::u64p::U64p;
+use std::intrinsics::transmute;
 
 pub unsafe fn digest_main(keccac: &mut [u8], scratch_pad: &mut [u8]) {
     init_scratchpad(keccac, scratch_pad);
@@ -24,16 +25,19 @@ pub unsafe fn digest_main(keccac: &mut [u8], scratch_pad: &mut [u8]) {
     finalize_state(keccac, &scratch_pad);
 }
 
-fn init_scratchpad(keccac: &[u8], scratchpad: &mut [u8]) {
-    let round_keys_buffer = derive_key(&keccac[..32]);
+unsafe fn init_scratchpad(keccac: &[u8], scratchpad: &mut [u8]) {
+    let round_keys_buffer: [__m128i; 10] = transmute(derive_key(&keccac[..32]));
 
     let mut blocks = [0u8; 128];
     blocks.copy_from_slice(&keccac[64..192]);
 
+    let mut blocks: [__m128i; 8] = transmute(blocks);
+    let scratchpad: &mut [__m128i] = cast_mut(scratchpad);
+
     for scratchpad_chunk in scratchpad.chunks_exact_mut(blocks.len()) {
-        for block in blocks.chunks_exact_mut(16) {
-            for key in round_keys_buffer.chunks_exact(16) {
-                aes_round(block, key);
+        for block in blocks.iter_mut() {
+            for key in round_keys_buffer.iter() {
+                *block = _mm_aesenc_si128(*block, *key);
             }
         }
 
