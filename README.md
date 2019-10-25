@@ -45,5 +45,5 @@ traits in the `digest` crate.
 
 ## Wish list
 
-- [ ] Support CPU extensions for key generation
+- [x] Support CPU extensions for key generation
 - [ ] `nostd` support
