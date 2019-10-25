@@ -28,6 +28,7 @@ jh-x86_64 = "0.2.2"
 skein-hash = "0.3.0"
 
 [dev-dependencies]
+criterion = "0.3.0"
 hex = "0.4.0"
 hex-literal = "0.2.1"
 
@@ -36,3 +37,7 @@ default = ["aesni"]
 
 # Enable AES CPU extensions if available.
 aesni = []
+
+[[bench]]
+name = "benchmarks"
+harness = false
