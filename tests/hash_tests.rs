@@ -1,4 +1,4 @@
-use cryptonight::CryptoNight;
+use cryptonight_hash::CryptoNight;
 use digest::Digest;
 
 #[test]
