@@ -104,10 +104,28 @@ impl CryptoNight {
     ///
     /// If the buffer provided is not acceptable, this method will panic.
     pub fn digest_with_buffer<B>(data: B, scratchpad: &mut [u8]) -> GenericArray<u8, <Self as FixedOutput>::OutputSize>
-    where B: AsRef<[u8]> {
+        where B: AsRef<[u8]> {
         let mut hasher: Self = Default::default();
         Input::input(&mut hasher, data);
         hasher.fixed_result_with_buffer(scratchpad)
+    }
+
+    /// Allocate a reusable scratchpad for use with the `_with_buffer` methods.
+    ///
+    /// The resulting buffer is guaranteed to be on the heap. Its contents are undefinded.
+    ///
+    /// # Usage
+    /// ```
+    /// # use cryptonight_hash::CryptoNight;
+    /// let mut buffer = CryptoNight::allocate_scratchpad();
+    ///
+    /// CryptoNight::digest_with_buffer(b"Your data", buffer.as_mut());
+    /// ```
+    pub fn allocate_scratchpad() -> impl AsMut<[u8]> {
+        unsafe {
+            let buffer = alloc(Layout::from_size_align_unchecked(Self::SP_SIZE, Self::SP_ALIGNMENT));
+            Vec::from_raw_parts(buffer, Self::SP_SIZE, Self::SP_SIZE)
+        }
     }
 
     fn digest_main(keccac: &mut [u8], scratchpad: &mut [u8]) {
@@ -151,11 +169,8 @@ impl FixedOutput for CryptoNight {
     type OutputSize = U32;
 
     fn fixed_result(self) -> GenericArray<u8, Self::OutputSize> {
-        let mut scratch_pad = unsafe {
-            let buffer = alloc(Layout::from_size_align_unchecked(Self::SP_SIZE, Self::SP_ALIGNMENT));
-            Vec::from_raw_parts(buffer, Self::SP_SIZE, Self::SP_SIZE)
-        };
+        let mut scratchpad = Self::allocate_scratchpad();
 
-        self.fixed_result_with_buffer(&mut scratch_pad)
+        self.fixed_result_with_buffer(scratchpad.as_mut())
     }
 }

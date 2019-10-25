@@ -1,5 +1,3 @@
-use std::alloc::{alloc, Layout};
-
 use criterion::{Bencher, black_box, Criterion, criterion_group, criterion_main};
 use criterion::measurement::WallTime;
 use digest::Digest;
@@ -7,12 +5,9 @@ use digest::Digest;
 use cryptonight_hash::CryptoNight;
 
 fn bench_buffer_reuse(b: &mut Bencher<WallTime>) {
-    let mut scratchpad = unsafe {
-        let buffer = alloc(Layout::from_size_align_unchecked(CryptoNight::SP_SIZE, CryptoNight::SP_ALIGNMENT));
-        Vec::from_raw_parts(buffer, CryptoNight::SP_SIZE, CryptoNight::SP_SIZE)
-    };
+    let mut scratchpad = CryptoNight::allocate_scratchpad();
 
-    b.iter(|| CryptoNight::digest_with_buffer(black_box(b""), &mut scratchpad));
+    b.iter(|| CryptoNight::digest_with_buffer(black_box(b""), scratchpad.as_mut()));
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {

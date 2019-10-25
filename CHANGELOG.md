@@ -4,6 +4,7 @@
   - `CryptoNight::fixed_result_with_buffer` extends `Digest::fixed_result`.
   - `CryptoNight::digest_with_buffer` extends `Digest::digest`.
   - Both methods will panic if provided with bad buffers.
+  - Use `CryptoNight::allocate_scratchpad` to get a suitable buffer.
 
 # v0.1.2
 
