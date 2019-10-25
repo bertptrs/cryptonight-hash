@@ -72,22 +72,22 @@ unsafe fn derive_key(mut temp1: __m128i, mut temp3: __m128i) -> KeysType {
 
     key_256_assist_1(&mut temp1, _mm_aeskeygenassist_si128(temp3, 0x01));
     keys[2] = temp1;
-    key_256_assist_2(&mut temp1, &mut temp3);
+    key_256_assist_2(&temp1, &mut temp3);
     keys[3] = temp3;
 
     key_256_assist_1(&mut temp1, _mm_aeskeygenassist_si128(temp3, 0x02));
     keys[4] = temp1;
-    key_256_assist_2(&mut temp1, &mut temp3);
+    key_256_assist_2(&temp1, &mut temp3);
     keys[5] = temp3;
 
     key_256_assist_1(&mut temp1, _mm_aeskeygenassist_si128(temp3, 0x04));
     keys[6] = temp1;
-    key_256_assist_2(&mut temp1, &mut temp3);
+    key_256_assist_2(&temp1, &mut temp3);
     keys[7] = temp3;
 
     key_256_assist_1(&mut temp1, _mm_aeskeygenassist_si128(temp3, 0x08));
     keys[8] = temp1;
-    key_256_assist_2(&mut temp1, &mut temp3);
+    key_256_assist_2(&temp1, &mut temp3);
     keys[9] = temp3;
 
     keys
