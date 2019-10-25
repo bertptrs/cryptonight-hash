@@ -1,7 +1,38 @@
+//! An implementation of the [CryptoNight][1] digest algorithm.
+//!
+//! # Usage
+//!
+//! ```rust
+//! # #[macro_use] extern crate hex_literal;
+//! # fn main() {
+//! use cryptonight_hash::{CryptoNight, Digest};
+//!
+//! // Create the CryptoNight hasher
+//! let mut hasher = CryptoNight::new();
+//!
+//! // Input some data into the hasher
+//! hasher.input(b"This is ");
+//!
+//! // Insert more data as needed.
+//! hasher.input("a test");
+//!
+//! // Finalize the result. This will temporary allocate a 2MB buffer.
+//! let result = hasher.result();
+//!
+//! assert_eq!(result[..], hex!("a084f01d1437a09c6985401b60d43554ae105802c5f5d8a9b3253649c0be6605")[..]);
+//!
+//! # }
+//! ```
+//!
+//! Be sure to refer to the [RustCrypto/hashes][2] readme for more more
+//! information about the Digest traits.
+//!
+//! [1]: https://cryptonote.org/cns/cns008.txt
+//! [2]: https://github.com/RustCrypto/hashes
 use std::alloc::{alloc, Layout};
 
 use blake_hash::Blake256;
-use digest::{Digest, FixedOutput, Input, Reset};
+pub use digest::{BlockInput, Digest, FixedOutput, Input, Reset};
 use digest::generic_array::GenericArray;
 use digest::generic_array::typenum::{U200, U32};
 use groestl::Groestl256;
@@ -19,7 +50,8 @@ const ROUNDS: usize = 524_288;
 /// Helper to enforce 16 byte alignment
 struct A16<T>(pub T);
 
-#[derive(Default, Clone)]
+/// CryptoNight version 0 implementation.
+#[derive(Debug, Default, Clone)]
 pub struct CryptoNight {
     internal_hasher: sha3::Keccak256Full,
 }
@@ -58,6 +90,10 @@ impl Reset for CryptoNight {
     fn reset(&mut self) {
         Reset::reset(&mut self.internal_hasher);
     }
+}
+
+impl BlockInput for CryptoNight {
+    type BlockSize = <sha3::Keccak256Full as BlockInput>::BlockSize;
 }
 
 impl FixedOutput for CryptoNight {
