@@ -1,6 +1,10 @@
 # cryptonight-hash
 
 [![Build Status](https://travis-ci.org/bertptrs/cryptonight-hash.svg?branch=master)](https://travis-ci.org/bertptrs/cryptonight-hash)
+[![Crates.io](https://img.shields.io/crates/v/cryptonight-hash)](https://crates.io/crates/cryptonight-hash)
+[![Documentation](https://docs.rs/cryptonight-hash/badge.svg)](https://docs.rs/cryptonight-hash/)
+![Crates.io](https://img.shields.io/crates/l/cryptonight-hash)
+
 
 A pure-rust implementation of the CryptoNight digest algorithm. The
 implementation is based on the specification in
