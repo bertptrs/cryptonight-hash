@@ -12,7 +12,7 @@
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use std::mem::{MaybeUninit, size_of};
+use std::mem::size_of;
 
 use slice_cast::cast_mut;
 
@@ -99,8 +99,7 @@ unsafe fn derive_key(mut temp1: __m128i, mut temp3: __m128i) -> KeysType {
 #[target_feature(enable = "sse2")]
 unsafe fn init_scratchpad(keccac: &[__m128i], scratchpad: &mut [__m128i]) {
     let keys = derive_key(keccac[0], keccac[1]);
-    let mut blocks: [__m128i; 8] = MaybeUninit::uninit().assume_init();
-    blocks.copy_from_slice(&keccac[4..]);
+    let mut blocks: [__m128i; 8] = *(keccac[4..].as_ptr() as *const [__m128i; 8]);
 
     for scratchpad_chunk in scratchpad.chunks_exact_mut(blocks.len()) {
         for block in blocks.iter_mut() {
