@@ -37,7 +37,7 @@ use digest::generic_array::GenericArray;
 use digest::generic_array::typenum::{U200, U32};
 use groestl::Groestl256;
 use jh_x86_64::Jh256;
-use skein_hash::Skein256;
+use skein_hash::Skein512;
 
 mod aes;
 #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "aesni"))]
@@ -74,8 +74,8 @@ impl CryptoNight {
             0 => Blake256::digest(&state),
             1 => Groestl256::digest(&state),
             2 => Jh256::digest(&state),
-            3 => Skein256::digest(&state),
-            _ => unreachable!("Invalid output option")
+            3 => Skein512::digest(&state),
+            x => unreachable!("Invalid output option {}", x)
         }
     }
 }

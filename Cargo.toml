@@ -2,7 +2,7 @@
 name = "cryptonight-hash"
 description = "A pure-rust implementation of the CryptoNight digest algorithm."
 keywords = ["cryptonight", "cryptonote", "aesni", "hash", "digest"]
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Bert Peters <bert@bertptrs.nl>"]
 edition = "2018"
 repository = "https://github.com/bertptrs/cryptonight-hash"
