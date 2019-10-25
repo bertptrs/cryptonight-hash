@@ -5,6 +5,15 @@ keywords = ["cryptonight", "cryptonote", "aes", "aesni", "hash", "digest"]
 version = "0.1.0"
 authors = ["Bert Peters <bert@bertptrs.nl>"]
 edition = "2018"
+repository = "https://github.com/bertptrs/cryptonight-hash"
+readme = "README.md"
+categories = ["cryptography::cryptocurrencies"]
+license = "MIT"
+documentation = "https://docs.rs/cryptonight-hash"
+
+[badges]
+travis-ci = { repository = "bertptrs/cryptonight-hash", branch = "master" }
+maintenance = { status = "actively-developed" }
 
 [dependencies]
 digest = "0.8.1"

@@ -1,3 +1,9 @@
 /target
 **/*.rs.bk
 Cargo.lock
+
+
+# Performance measurement
+perf.data
+perf.data.old
+flamegraph.svg
