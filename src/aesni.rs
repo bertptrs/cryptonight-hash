@@ -21,6 +21,8 @@ use crate::ROUNDS;
 /// Type for a set of explode/implode AES keys.
 type KeysType = [__m128i; 10];
 
+#[target_feature(enable = "aes")]
+#[target_feature(enable = "sse2")]
 pub unsafe fn digest_main(keccac: &mut [u8], scratchpad: &mut [u8]) {
     // Cast to SSE types
     let scratchpad: &mut [__m128i] = cast_mut(scratchpad);
@@ -155,7 +157,8 @@ unsafe fn cn_8byte_mul(a: __m128i, b: __m128i) -> __m128i {
     _mm_set_epi64x(c as i64, (c >> 64) as i64)
 }
 
-#[inline(always)]
+#[target_feature(enable = "aes")]
+#[target_feature(enable = "sse2")]
 unsafe fn finalize_state(keccac: &mut [__m128i], scratchpad: &[__m128i]) {
     let keys = derive_key(keccac[2], keccac[3]);
     let final_block: &mut [__m128i] = cast_mut(&mut keccac[4..]);
