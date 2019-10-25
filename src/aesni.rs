@@ -119,17 +119,17 @@ unsafe fn main_loop(keccac: &[__m128i], scratchpad: &mut [__m128i]) {
 
     for _ in 0..ROUNDS {
         // First transfer
-        let address = to_sp_index(a);
-        scratchpad[address] = _mm_aesenc_si128(scratchpad[address], a);
+        let address = scratchpad.get_unchecked_mut(to_sp_index(a));
+        *address = _mm_aesenc_si128(*address, a);
         let tmp = b;
-        b = scratchpad[address];
-        scratchpad[address] = _mm_xor_si128(scratchpad[address], tmp);
+        b = *address;
+        *address = _mm_xor_si128(*address, tmp);
 
         // Second transfer
-        let address = to_sp_index(b);
-        let tmp = cn_8byte_add(a, cn_8byte_mul(b, scratchpad[address]));
-        a = _mm_xor_si128(scratchpad[address], tmp);
-        scratchpad[address] = tmp;
+        let address = scratchpad.get_unchecked_mut(to_sp_index(b));
+        let tmp = cn_8byte_add(a, cn_8byte_mul(b, *address));
+        a = _mm_xor_si128(*address, tmp);
+        *address = tmp;
     }
 }
 
