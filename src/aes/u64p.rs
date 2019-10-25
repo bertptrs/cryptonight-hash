@@ -53,7 +53,8 @@ impl From<U64p> for [u8; 16] {
         }
     }
 }
-/// Perform the 8byte addition for
+
+/// Perform the cn 8byte_add operation.
 impl Add for U64p {
     type Output = Self;
 
@@ -62,6 +63,7 @@ impl Add for U64p {
     }
 }
 
+/// Perform the cn 8byte_mul operation.
 impl Mul for U64p {
     type Output = U64p;
 

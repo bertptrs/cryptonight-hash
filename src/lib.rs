@@ -11,7 +11,6 @@ use skein_hash::Skein256;
 mod aes;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 mod aesni;
-mod u64p;
 
 const SCRATCH_PAD_SIZE: usize = 1 << 21;
 const ROUNDS: usize = 524_288;
