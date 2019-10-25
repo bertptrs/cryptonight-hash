@@ -2,9 +2,8 @@
 //!
 //! # Usage
 //!
-//! ```rust
-//! # #[macro_use] extern crate hex_literal;
-//! # fn main() {
+//! ```
+//! # use hex_literal::hex;
 //! use cryptonight_hash::{CryptoNight, Digest};
 //!
 //! // Create the CryptoNight hasher
@@ -20,8 +19,6 @@
 //! let result = hasher.result();
 //!
 //! assert_eq!(result[..], hex!("a084f01d1437a09c6985401b60d43554ae105802c5f5d8a9b3253649c0be6605")[..]);
-//!
-//! # }
 //! ```
 //!
 //! Be sure to refer to the [RustCrypto/hashes][2] readme for more more
@@ -43,7 +40,6 @@ mod aes;
 #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "aesni"))]
 mod aesni;
 
-const SCRATCH_PAD_SIZE: usize = 1 << 21;
 const ROUNDS: usize = 524_288;
 
 #[repr(align(16))]
@@ -58,6 +54,62 @@ pub struct CryptoNight {
 
 
 impl CryptoNight {
+    /// Alignment requirement for the scratch pad.
+    pub const SP_ALIGNMENT: usize = 16;
+    /// Scratch pad size.
+    pub const SP_SIZE: usize = 1 << 21;
+
+    /// Compute a digest with a provided buffer.
+    ///
+    /// This method performs no allocations.
+    ///
+    /// This method performs no allocations, as opposed to the
+    /// `fixed_result` method. However, the scratchpad should be of
+    /// proper length and alignment. See the `SP_ALIGNMENT` and `SP_SIZE`
+    /// constants for the exact requirements.
+    ///
+    /// See also: `Digest::fixed_result()`.
+    ///
+    /// # Panics
+    ///
+    /// If the buffer provided is not acceptable, this method will panic.
+    pub fn fixed_result_with_buffer(self, scratchpad: &mut [u8]) -> GenericArray<u8, <Self as FixedOutput>::OutputSize> {
+        // Ensure that our alignment requirements are met.
+        assert_eq!(scratchpad.as_ptr() as usize & (Self::SP_ALIGNMENT - 1), 0);
+        assert_eq!(scratchpad.len(), Self::SP_SIZE);
+
+        let mut keccac = A16(self.internal_hasher.fixed_result());
+        let keccac = &mut keccac.0;
+
+        Self::digest_main(keccac, scratchpad);
+
+        #[allow(clippy::cast_ptr_alignment)]
+            tiny_keccak::keccakf(unsafe { &mut *(keccac as *mut GenericArray<u8, U200> as *mut [u64; 25]) });
+
+        Self::hash_final_state(&keccac)
+    }
+
+    /// Compute a digest with a provided buffer.
+    ///
+    /// This method performs no allocations.
+    ///
+    /// This method performs no allocations, as opposed to the
+    /// `fixed_result` method. However, the scratchpad should be of
+    /// proper length and alignment. See the `SP_ALIGNMENT` and `SP_SIZE`
+    /// constants for the exact requirements.
+    ///
+    /// See also: `Digest::digest()`.
+    ///
+    /// # Panics
+    ///
+    /// If the buffer provided is not acceptable, this method will panic.
+    pub fn digest_with_buffer<B>(data: B, scratchpad: &mut [u8]) -> GenericArray<u8, <Self as FixedOutput>::OutputSize>
+    where B: AsRef<[u8]> {
+        let mut hasher: Self = Default::default();
+        Input::input(&mut hasher, data);
+        hasher.fixed_result_with_buffer(scratchpad)
+    }
+
     fn digest_main(keccac: &mut [u8], scratchpad: &mut [u8]) {
         #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "aesni"))]
             {
@@ -65,7 +117,6 @@ impl CryptoNight {
                     return unsafe { aesni::digest_main(keccac, scratchpad) };
                 }
             }
-
         aes::digest_main(keccac, scratchpad);
     }
 
@@ -100,19 +151,11 @@ impl FixedOutput for CryptoNight {
     type OutputSize = U32;
 
     fn fixed_result(self) -> GenericArray<u8, Self::OutputSize> {
-        let mut keccac = A16(self.internal_hasher.fixed_result());
-        let keccac = &mut keccac.0;
-
         let mut scratch_pad = unsafe {
-            let buffer = alloc(Layout::from_size_align_unchecked(SCRATCH_PAD_SIZE, 16));
-            Vec::from_raw_parts(buffer, SCRATCH_PAD_SIZE, SCRATCH_PAD_SIZE)
+            let buffer = alloc(Layout::from_size_align_unchecked(Self::SP_SIZE, Self::SP_ALIGNMENT));
+            Vec::from_raw_parts(buffer, Self::SP_SIZE, Self::SP_SIZE)
         };
 
-        Self::digest_main(keccac, &mut scratch_pad);
-
-        #[allow(clippy::cast_ptr_alignment)]
-            tiny_keccak::keccakf(unsafe { &mut *(keccac as *mut GenericArray<u8, U200> as *mut [u64; 25]) });
-
-        Self::hash_final_state(&keccac)
+        self.fixed_result_with_buffer(&mut scratch_pad)
     }
 }

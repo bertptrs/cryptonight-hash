@@ -1,3 +1,5 @@
+use std::alloc::{alloc, Layout};
+
 use digest::Digest;
 use hex_literal::hex;
 
@@ -26,6 +28,21 @@ fn validate_samples() {
     for (i, (&input, &output)) in INPUTS.iter().zip(OUTPUTS.iter()).enumerate() {
         println!("{}: {}", i, hex::encode(input));
         let result = CryptoNight::digest(input);
+
+        assert_eq!(result[..], output[..]);
+    }
+}
+
+#[test]
+fn validate_with_buffer() {
+    let mut scratchpad = unsafe {
+        let buffer = alloc(Layout::from_size_align_unchecked(CryptoNight::SP_SIZE, CryptoNight::SP_ALIGNMENT));
+        Vec::from_raw_parts(buffer, CryptoNight::SP_SIZE, CryptoNight::SP_SIZE)
+    };
+
+    for (i, (&input, &output)) in INPUTS.iter().zip(OUTPUTS.iter()).enumerate() {
+        println!("{}: {}", i, hex::encode(input));
+        let result = CryptoNight::digest_with_buffer(input, &mut scratchpad);
 
         assert_eq!(result[..], output[..]);
     }
