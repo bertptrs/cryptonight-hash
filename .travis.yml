@@ -4,9 +4,17 @@ rust:
   - beta
   - nightly
 
+env:
+  - FEATURES=""
+  - FEATURES=--no-default-features
+
 jobs:
   allow_failures:
     - rust: nightly
   fast_finish: true
 
 cache: cargo
+
+script:
+  - cargo build --verbose $FEATURES
+  - cargo test --verbose $FEATURES

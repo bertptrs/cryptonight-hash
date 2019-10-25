@@ -6,6 +6,10 @@ A pure-rust implementation of the CryptoNight digest algorithm. The
 implementation is based on the specification in
 [CryptoNote standard 8](https://cryptonote.org/cns/cns008.txt).
 
+The crate is compiled with support for AES CPU extensions if the
+platform supports it, currently only on x86 and x86_64. It is possible
+to disable this by disabling the default features.
+
 ## Features
 
 - [`digest`](https://crates.io/crates/digest)-compatible implementation

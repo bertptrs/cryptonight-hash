@@ -21,3 +21,9 @@ skein-hash = "0.3.0"
 [dev-dependencies]
 hex = "0.4.0"
 hex-literal = "0.2.1"
+
+[features]
+default = ["aesni"]
+
+# Enable AES CPU extensions if available.
+aesni = []
