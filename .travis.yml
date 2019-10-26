@@ -6,7 +6,8 @@ rust:
 
 env:
   - FEATURES=""
-  - FEATURES=--no-default-features
+  # Run these tests in release mode to speed them up a little.
+  - FEATURES=--no-default-features --release
 
 jobs:
   allow_failures:
