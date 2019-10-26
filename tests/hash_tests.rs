@@ -3,6 +3,11 @@ use hex_literal::hex;
 
 use cryptonight_hash::CryptoNight;
 
+/// Sample inputs for version 0 of the algorithm.
+///
+/// Taken from both CryptoNote standard 8 and
+/// monero/tests/hash/tests-slow.txt. With these test cases, every
+/// individual secondary hash function is hit.
 const INPUTS: &[&[u8]] = &[
     b"",
     b"This is a test",
@@ -22,7 +27,7 @@ const OUTPUTS: &[[u8; 32]] = &[
 ];
 
 #[test]
-fn validate_samples() {
+fn validate_with_allocator() {
     for (i, (&input, &output)) in INPUTS.iter().zip(OUTPUTS.iter()).enumerate() {
         println!("{}: {}", i, hex::encode(input));
         let result = CryptoNight::digest(input);

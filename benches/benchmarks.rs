@@ -11,11 +11,11 @@ fn bench_buffer_reuse(b: &mut Bencher<WallTime>) {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("Empty hash", |b| {
+    c.bench_function("Hash with allocator", |b| {
         b.iter(|| CryptoNight::digest(black_box(b"")));
     });
 
-    c.bench_function("Reuse buffer", bench_buffer_reuse);
+    c.bench_function("Hash with external buffer", bench_buffer_reuse);
 }
 
 criterion_group!(benches, criterion_benchmark);
